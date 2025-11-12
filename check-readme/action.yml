@@ -1,0 +1,57 @@
+on:
+  workflow_call:
+
+jobs:
+  check_readme:
+    name: Check README version table
+    runs-on: ubuntu-latest
+    if: |
+      github.event.issue.pull_request
+      && (contains(github.event.comment.body, '[test]')
+      || contains(github.event.comment.body, '[test-pytest]')
+      || contains(github.event.comment.body, '[test-openshift]')
+      || contains(github.event.comment.body, '[test-openshift-pytest]')
+      || contains(github.event.comment.body, '[test-upstream]')
+      || contains(github.event.comment.body, '[test-all]')
+      )
+      && contains(fromJSON('["OWNER", "MEMBER"]'), github.event.comment.author_association)
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          ref: "refs/pull/${{ github.event.issue.number }}/head"
+          submodules: true
+
+      - name: Update the available versions table in README.md
+        id: check
+        shell: bash
+        run: |
+          sha=$(git rev-parse HEAD)
+          sudo apt update && sudo apt -y install python3 python3-natsort
+          result="failure"
+          git status
+          make version-table
+          if git diff --ignore-submodules=all --exit-code ; then
+            result="success"
+          fi
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Set final commit status
+        uses: myrotvorets/set-commit-status-action@v2.0.0
+        with:
+          status: ${{ steps.check.outputs.result }}
+          context: "README table check"
+          sha: ${{ steps.check.outputs.sha }}
+
+      - name: Exit on ERR
+        shell: bash
+        run: |
+          _result=${{ steps.check.outputs.result }}
+          if [[ "$_result" == "failure" ]]; then
+            echo "Incorrect version table in README.md"
+            echo "Please re-generate it with:"
+            echo "'make version-table'"
+            echo "Note that you need to have 'python' and 'python-natsort' installed"
+            exit 1
+          fi

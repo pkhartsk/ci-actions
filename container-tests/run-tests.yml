@@ -1,0 +1,40 @@
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      os_test:
+        required: true
+        type: string
+      test_case:
+        required: true
+        type: string
+    secrets:
+      TF_PUBLIC_API_KEY:
+        required: true
+      TF_INTERNAL_API_KEY:
+        required: true
+
+jobs:
+  run-tests:
+    name: "${{ matrix.test_case }} tests: ${{ matrix.version }} - ${{ matrix.os_test }}"
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ matrix.test_case }}-${{ github.event.issue.number }}-${{ matrix.version }}-${{ matrix.os_test }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(inputs.version) }}
+        os_test: ${{ fromJSON(inputs.os_test) }}
+        test_case: ${{ fromJSON(inputs.test_case) }}
+
+    steps:
+      - uses: sclorg/tfaga-wrapper@main
+        with:
+          os_test: ${{ matrix.os_test }}
+          version: ${{ matrix.version }}
+          test_case: ${{ matrix.test_case }}
+          public_api_key: ${{ secrets.TF_PUBLIC_API_KEY }}
+          private_api_key: ${{ secrets.TF_INTERNAL_API_KEY }}

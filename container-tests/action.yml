@@ -1,0 +1,113 @@
+on:
+  workflow_call:
+    inputs:
+      versions:
+        required: true
+        type: string
+      openshift-versions:
+        required: false
+        type: string
+      enabled-tests:
+        required: true
+        type: string
+    secrets:
+      TF_PUBLIC_API_KEY:
+        required: true
+      TF_INTERNAL_API_KEY:
+        required: true
+
+jobs:
+  get_test_cases:
+    needs: check_readme
+    name: "Setup test case list"
+    runs-on: ubuntu-latest
+    outputs:
+      cases: ${{ steps.get_cases.outputs.cases }}
+      ocp_cases: ${{ steps.get_cases.outputs.ocp_cases }}
+      fips_cases: ${{ steps.get_cases.outputs.fips_cases }}
+    steps:
+      - id: get_cases
+        run: |
+          if ${{ (contains(github.event.comment.body, '[test]') 
+              || contains(github.event.comment.body, '[test-pytest]') 
+              || contains(github.event.comment.body, '[test-all]'))
+              && contains(inputs.enabled-tests, 'container') }}; then
+            if ${{ !contains(github.event.comment.body, '[test]')
+                && !contains(github.event.comment.body, '[test-all]')}}; then
+              cases='["container-pytest"]'
+            elif ${{ !contains(github.event.comment.body, '[test-pytest]')
+                  && !contains(github.event.comment.body, '[test-all]')}}; then
+              cases='["container"]'
+            else
+              cases='["container","container-pytest"]'
+            fi
+            echo -n "cases=" >> "$GITHUB_OUTPUT"
+            # equivalent of $cases intersection with enabled-tests
+            # in order to run only available tests
+            jq -nc "$cases"' - ('"$cases"' - ${{ inputs.enabled-tests }})' >> "$GITHUB_OUTPUT"
+          fi
+          if ${{ (contains(github.event.comment.body, '[test-openshift]') 
+              || contains(github.event.comment.body, '[test-openshift-pytest]') 
+              || contains(github.event.comment.body, '[test-all]'))
+              && contains(inputs.enabled-tests, 'openshift') }}; then
+            if ${{ !contains(github.event.comment.body, '[test-openshift]')
+                && !contains(github.event.comment.body, '[test-all]')}}; then
+              ocp_cases='["openshift-pytest"]'
+            elif ${{ !contains(github.event.comment.body, '[test-openshift-pytest]')
+                  && !contains(github.event.comment.body, '[test-all]')}}; then
+              ocp_cases='["openshift-4"]'
+            else
+              ocp_cases='["openshift-4","openshift-pytest"]'
+            fi
+            # equivalent of $ocp_cases intersection with enabled-tests
+            # in order to run only available tests
+            echo -n "ocp_cases=" >> "$GITHUB_OUTPUT"
+            jq -nc "$ocp_cases"' - ('"$ocp_cases"' - ${{ inputs.enabled-tests }})' >> "$GITHUB_OUTPUT"
+          fi
+          if ${{ (contains(github.event.comment.body, '[test]') 
+              || contains(github.event.comment.body, '[test-all]'))
+              && contains(inputs.enabled-tests, 'container-fips') }}; then
+            echo "fips_cases=['container-fips']" >> "$GITHUB_OUTPUT"
+          fi
+
+  container-tests:
+    needs: get_test_cases
+    if: needs.get_test_cases.outputs.cases
+    uses: ./container-tests/run-tests.yml
+    with:
+      version: inputs.versions
+      os_test: '[ "fedora", "rhel8", "rhel9", "rhel10", "c9s", "c10s" ]'
+      test_case: needs.get_test_cases.outputs.cases
+    secrets: inherit
+
+  check-imagestreams:
+    needs: get_test_cases
+    name: "Check imagestreams"
+    runs-on: ubuntu-latest
+    if: needs.get_test_cases.outputs.ocp_cases && inputs.openshift-versions
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: sclorg/ci-scripts/ocp-stream-generator@master
+        with:
+          ref: "refs/pull/${{ github.event.issue.number }}/head"
+
+  openshift-tests:
+    needs: [get_test_cases, check-imagestreams]
+    uses: ./container-tests/run-tests.yml
+    with:
+      version: inputs.openshift-versions
+      os_test: '[ "rhel8", "rhel9", "rhel10" ]'
+      test_case: needs.get_test_cases.outputs.ocp_cases
+    secrets: inherit
+
+  fips-tests:
+    needs: get_test_cases
+    if: needs.get_test_cases.outputs.fips_cases
+    uses: ./container-tests/run-tests.yml
+    with:
+      version: inputs.versions
+      os_test: '[ "rhel9", "rhel10" ]'
+      test_case: needs.get_test_cases.outputs.fips_cases
+    secrets: inherit
