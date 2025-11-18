@@ -1,6 +1,6 @@
-# GitHub actions for sclorg
+# GitHub workflows for SCLOrg
 
-This repo contains GitHub actions for re-use in this organisation.
+This repo contains GitHub workflows for re-use in this organisation.
 
 Eg. to check the README version table and run container tests,
 use a similar workflow:
@@ -12,10 +12,10 @@ on:
       - created
 jobs:
   check-readme:
-    uses: "sclorg/ci-actions/check-readme@main"
+    uses: "sclorg/ci-actions/.github/workflows/check-readme.yml@main"
   container-tests:
     needs: check-readme
-    uses: "sclorg/ci-actions/container-tests@main"
+    uses: "sclorg/ci-actions/.github/workflows/container-tests.yml@main"
     with:
       enabled-tests: '["container","container-pytest","openshift-4","openshift-pytest"]'
       versions: '[<versions here>]'

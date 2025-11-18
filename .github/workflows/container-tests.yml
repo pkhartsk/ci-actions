@@ -18,7 +18,6 @@ on:
 
 jobs:
   get_test_cases:
-    needs: check_readme
     name: "Setup test case list"
     runs-on: ubuntu-latest
     outputs:
@@ -73,11 +72,11 @@ jobs:
   container-tests:
     needs: get_test_cases
     if: needs.get_test_cases.outputs.cases
-    uses: ./container-tests/run-tests.yml
+    uses: ./.github/workflows/run-tests.yml
     with:
-      version: inputs.versions
+      version: ${{ inputs.versions }}
       os_test: '[ "fedora", "rhel8", "rhel9", "rhel10", "c9s", "c10s" ]'
-      test_case: needs.get_test_cases.outputs.cases
+      test_case: ${{ needs.get_test_cases.outputs.cases }}
     secrets: inherit
 
   check-imagestreams:
@@ -95,19 +94,19 @@ jobs:
 
   openshift-tests:
     needs: [get_test_cases, check-imagestreams]
-    uses: ./container-tests/run-tests.yml
+    uses: ./.github/workflows/run-tests.yml
     with:
-      version: inputs.openshift-versions
+      version: ${{ inputs.openshift-versions }}
       os_test: '[ "rhel8", "rhel9", "rhel10" ]'
-      test_case: needs.get_test_cases.outputs.ocp_cases
+      test_case: ${{ needs.get_test_cases.outputs.ocp_cases }}
     secrets: inherit
 
   fips-tests:
     needs: get_test_cases
     if: needs.get_test_cases.outputs.fips_cases
-    uses: ./container-tests/run-tests.yml
+    uses: ./.github/workflows/run-tests.yml
     with:
-      version: inputs.versions
+      version: ${{ inputs.versions }}
       os_test: '[ "rhel9", "rhel10" ]'
-      test_case: needs.get_test_cases.outputs.fips_cases
+      test_case: ${{ needs.get_test_cases.outputs.fips_cases }}
     secrets: inherit
