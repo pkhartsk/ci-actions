@@ -10,6 +10,9 @@ on:
       test_case:
         required: true
         type: string
+      exclude_matrix:
+        required: false
+        type: string
     secrets:
       TF_PUBLIC_API_KEY:
         required: true
@@ -29,6 +32,7 @@ jobs:
         version: ${{ fromJSON(inputs.version) }}
         os_test: ${{ fromJSON(inputs.os_test) }}
         test_case: ${{ fromJSON(inputs.test_case) }}
+        exclude: ${{ fromJSON(inputs.exclude_matrix) }}
 
     steps:
       - uses: sclorg/tfaga-wrapper@main

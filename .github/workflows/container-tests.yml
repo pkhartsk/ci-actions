@@ -24,6 +24,7 @@ jobs:
       cases: ${{ steps.get_cases.outputs.cases }}
       ocp_cases: ${{ steps.get_cases.outputs.ocp_cases }}
       fips_cases: ${{ steps.get_cases.outputs.fips_cases }}
+      exclude_matrix: ${{ steps.filter-matrix.outputs.exclude_matrix }}
     steps:
       - id: get_cases
         run: |
@@ -60,6 +61,15 @@ jobs:
             echo "fips_cases=['container-fips']" >> "$GITHUB_OUTPUT"
           fi
 
+      - id: checkout
+        uses: actions/checkout@v6
+
+      - name: "Install Node.js"
+        uses: actions/setup-node@v6
+
+      - id: filter-matrix
+        run: echo "exclude_matrix=$(node filter.js ${{ github.workspace }} ${{ inputs.versions }})" >> "$GITHUB_OUTPUT"
+
   container-tests:
     needs: get_test_cases
     if: needs.get_test_cases.outputs.cases
@@ -68,6 +78,7 @@ jobs:
       version: ${{ inputs.versions }}
       os_test: '[ "fedora", "rhel8", "rhel9", "rhel10", "rhel9-unsubscribed", "rhel10-unsubscribed", "c9s", "c10s" ]'
       test_case: ${{ needs.get_test_cases.outputs.cases }}
+      exclude_matrix: ${{ needs.get_test_cases.outputs.exclude_matrix }}
     secrets: inherit
 
   check-imagestreams:
