@@ -24,10 +24,11 @@ jobs:
       cases: ${{ steps.get_cases.outputs.cases }}
       ocp_cases: ${{ steps.get_cases.outputs.ocp_cases }}
       fips_cases: ${{ steps.get_cases.outputs.fips_cases }}
-      exclude_matrix: ${{ steps.filter-matrix.outputs.exclude_matrix }}
+      exclude_matrix: ${{ steps.filter_matrix.outputs.exclude_matrix }}
     steps:
       - id: get_cases
         run: |
+          pwd
           if ${{ (contains(github.event.comment.body, '[test]') 
               || contains(github.event.comment.body, '[test-pytest]') 
               || contains(github.event.comment.body, '[test-all]'))
@@ -67,8 +68,8 @@ jobs:
       - name: "Install Node.js"
         uses: actions/setup-node@v6
 
-      - id: filter-matrix
-        run: echo "exclude_matrix=$(node filter.js ${{ github.workspace }} ${{ inputs.versions }})" >> "$GITHUB_OUTPUT"
+      - id: filter_matrix
+        run: pwd && echo "exclude_matrix=$(node filter.js ${{ github.workspace }} ${{ inputs.versions }})" >> "$GITHUB_OUTPUT"
 
   container-tests:
     needs: get_test_cases
@@ -101,6 +102,7 @@ jobs:
       version: ${{ inputs.openshift-versions }}
       os_test: '[ "rhel8", "rhel9", "rhel10" ]'
       test_case: ${{ needs.get_test_cases.outputs.ocp_cases }}
+      exclude_matrix: ${{ needs.get_test_cases.outputs.exclude_matrix }}
     secrets: inherit
 
   fips-tests:
@@ -111,4 +113,5 @@ jobs:
       version: ${{ inputs.versions }}
       os_test: '[ "rhel9", "rhel10" ]'
       test_case: ${{ needs.get_test_cases.outputs.fips_cases }}
+      exclude_matrix: ${{ needs.get_test_cases.outputs.exclude_matrix }}
     secrets: inherit
